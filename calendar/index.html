@@ -141,12 +141,6 @@
   document.getElementById('prev').addEventListener('click', function () { stepMonth(-1); });
   document.getElementById('next').addEventListener('click', function () { stepMonth(1); });
 
-  function plural(n) {
-    if (n % 10 === 1 && n % 100 !== 11) { return 'запись'; }
-    if ([2, 3, 4].indexOf(n % 10) >= 0 && [12, 13, 14].indexOf(n % 100) < 0) { return 'записи'; }
-    return 'записей';
-  }
-
   function render() {
     var year = view.getFullYear();
     var month = view.getMonth();
@@ -192,17 +186,13 @@
       gridEl.appendChild(btn);
     }
 
-    var n = written().length;
-    totalEl.textContent = n ? n + ' ' + plural(n) : 'Пока пусто';
+    var n = Diary.written().length;
+    totalEl.textContent = n ? n + ' ' + Diary.plural(n, 'запись', 'записи', 'записей') : 'Пока пусто';
     exportBtn.disabled = !n;
   }
 
-  function written() {
-    return Diary.days().filter(function (d) { return Diary.get(d).text.trim(); });
-  }
-
   exportBtn.addEventListener('click', function () {
-    var dates = written();
+    var dates = Diary.written();
     if (!dates.length) { return; }
 
     var out = ['# Дневник', ''];

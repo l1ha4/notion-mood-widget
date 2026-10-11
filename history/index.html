@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>История</title>
+<link rel="stylesheet" href="../diary.css">
+<style>
+  body { display: flex; }
+
+  .wrap {
+    width: 100%;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .top { flex: none; }
+
+  input[type="search"] {
+    flex: none;
+    width: 100%;
+    padding: 6px 9px;
+    font: inherit;
+    font-size: 12px;
+    color: var(--text);
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  input[type="search"]::placeholder { color: var(--text-faint); }
+  input[type="search"]:hover { border-color: var(--sel-line); }
+  input[type="search"]:focus { outline: none; border-color: var(--sel-line); }
+  input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) opacity(.5); }
+
+  .list {
+    flex: 1 1 auto;
+    min-height: 40px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin: 0 -4px;
+    padding: 0 4px;
+  }
+
+  .row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    width: 100%;
+    padding: 5px 6px;
+    font: inherit;
+    font-size: 12px;
+    text-align: left;
+    color: var(--text-dim);
+    background: transparent;
+    border: 0;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+
+  .row:hover { background: var(--hover); }
+  .row.open { background: var(--sel-bg); color: var(--text); }
+
+  .row .d {
+    flex: none;
+    width: 76px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .row.today .d { font-weight: 600; color: var(--text); }
+
+  .row .s {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text);
+  }
+
+  .full {
+    padding: 2px 6px 9px 90px;
+    font-size: 12px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    color: var(--text);
+  }
+
+  mark {
+    padding: 0 1px;
+    color: inherit;
+    background: rgba(var(--ink), 0.16);
+    border-radius: 2px;
+  }
+
+  .empty {
+    padding: 10px 6px;
+    font-size: 12px;
+    color: var(--text-faint);
+  }
+
+  @media (max-width: 380px) {
+    .row .d { width: 60px; }
+    .full { padding-left: 6px; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <span class="title">История</span>
+      <span class="muted" id="count"></span>
+    </div>
+
+    <input type="search" id="q" placeholder="Найти запись…" autocomplete="off" spellcheck="false">
+
+    <div class="list" id="list"></div>
+  </div>
+
+<script src="../diary.js"></script>
+<script>
+(function () {
+  var qEl = document.getElementById('q');
+  var listEl = document.getElementById('list');
+  var countEl = document.getElementById('count');
+
+  var open = null;   // раскрытая запись
+  var query = '';
+
+  function esc(s) {
+    return s.replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+
+  function mark(text, q) {
+    var safe = esc(text);
+    if (!q) { return safe; }
+    var needle = esc(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return safe.replace(new RegExp(needle, 'gi'), function (hit) {
+      return '<mark>' + hit + '</mark>';
+    });
+  }
+
+  function label(date) {
+    var d = Diary.parse(date);
+    var month = Diary.longDate(date).split(' ')[1].slice(0, 3);
+    return d.getDate() + ' ' + month + ', ' + Diary.weekdayShort(date);
+  }
+
+  function snippet(text) {
+    return text.trim().replace(/\s+/g, ' ').slice(0, 160);
+  }
+
+  function matches(date, text, q) {
+    if (!q) { return true; }
+    return (text + ' ' + label(date) + ' ' + date).toLowerCase().indexOf(q) >= 0;
+  }
+
+  function render() {
+    var q = query.trim().toLowerCase();
+    var today = Diary.today();
+    var all = Diary.written().reverse();
+    var hits = all.filter(function (date) {
+      return matches(date, Diary.get(date).text, q);
+    });
+
+    countEl.textContent = !all.length ? ''
+      : q ? hits.length + ' из ' + all.length
+      : all.length + ' ' + Diary.plural(all.length, 'запись', 'записи', 'записей');
+
+    listEl.textContent = '';
+
+    if (!hits.length) {
+      var empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.textContent = all.length
+        ? 'Ничего не найдено'
+        : 'Пока нет записей — они появятся здесь';
+      listEl.appendChild(empty);
+      return;
+    }
+
+    hits.forEach(function (date) {
+      var text = Diary.get(date).text;
+      var row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'row' + (date === today ? ' today' : '') +
+        (date === open ? ' open' : '');
+      row.dataset.date = date;
+      row.innerHTML = '<span class="d">' + mark(label(date), q) + '</span>' +
+        '<span class="s">' + mark(snippet(text), q) + '</span>';
+
+      row.addEventListener('click', function () {
+        open = (open === date) ? null : date;
+        // Курсор общий: открытый день подхватит страница записи.
+        if (open) { Diary.setCursor(open); } else { render(); }
+      });
+
+      listEl.appendChild(row);
+
+      if (date === open) {
+        var full = document.createElement('div');
+        full.className = 'full';
+        full.innerHTML = mark(text, q);
+        listEl.appendChild(full);
+      }
+    });
+  }
+
+  qEl.addEventListener('input', function () {
+    query = qEl.value;
+    render();
+  });
+
+  Diary.onChange(function () {
+    // Клик по дню в календаре раскрывает соответствующую запись.
+    var c = Diary.cursor();
+    if (Diary.get(c).text.trim()) { open = c; }
+    render();
+    var el = listEl.querySelector('.row.open');
+    if (el) { el.scrollIntoView({ block: 'nearest' }); }
+  });
+
+  Diary.watchMidnight(render);
+  render();
+})();
+</script>
+</body>
+</html>

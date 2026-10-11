@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Счётчик</title>
+<link rel="stylesheet" href="../diary.css">
+<style>
+  body { display: flex; align-items: center; }
+
+  .wrap {
+    width: 100%;
+    display: flex;
+    align-items: stretch;
+    gap: 4px;
+  }
+
+  .cell {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+  }
+
+  .num {
+    font-size: 19px;
+    font-weight: 600;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .num.zero { color: var(--text-dim); }
+
+  .cap {
+    font-size: 11px;
+    line-height: 1.2;
+    color: var(--text-dim);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .note {
+    margin-top: 2px;
+    font-size: 11px;
+    line-height: 1.2;
+    color: var(--text-faint);
+  }
+
+  .note[hidden] { display: none; }
+
+  @media (max-width: 320px) {
+    .cell { padding: 7px 8px; }
+    .num { font-size: 17px; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="cell">
+      <span class="num" id="total">0</span>
+      <span class="cap" id="total-cap">записей</span>
+    </div>
+    <div class="cell">
+      <span class="num" id="streak">0</span>
+      <span class="cap" id="streak-cap">дней подряд</span>
+      <span class="note" id="note" hidden>сегодня ещё не записано</span>
+    </div>
+    <div class="cell">
+      <span class="num" id="best">0</span>
+      <span class="cap">лучшая серия</span>
+    </div>
+  </div>
+
+<script src="../diary.js"></script>
+<script>
+(function () {
+  var totalEl = document.getElementById('total');
+  var totalCap = document.getElementById('total-cap');
+  var streakEl = document.getElementById('streak');
+  var streakCap = document.getElementById('streak-cap');
+  var bestEl = document.getElementById('best');
+  var note = document.getElementById('note');
+
+  function render() {
+    var written = Diary.written();
+    var total = written.length;
+    var streak = Diary.streak();
+    var best = Diary.best();
+
+    totalEl.textContent = total;
+    totalEl.classList.toggle('zero', !total);
+    totalCap.textContent = Diary.plural(total, 'запись', 'записи', 'записей');
+
+    streakEl.textContent = streak;
+    streakEl.classList.toggle('zero', !streak);
+    streakCap.textContent = streak === 1 ? 'день подряд'
+      : Diary.plural(streak, 'день подряд', 'дня подряд', 'дней подряд');
+
+    bestEl.textContent = best;
+    bestEl.classList.toggle('zero', !best);
+
+    // Серия держится на вчерашней записи — стоит напомнить.
+    note.hidden = !(streak > 0 && written.indexOf(Diary.today()) < 0);
+  }
+
+  Diary.onChange(render);
+  Diary.watchMidnight(render);
+  render();
+})();
+</script>
+</body>
+</html>

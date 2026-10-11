@@ -12,6 +12,7 @@ window.Diary = (function () {
     'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
   var WEEKDAYS = ['Понедельник', 'Вторник', 'Среда', 'Четверг',
     'Пятница', 'Суббота', 'Воскресенье'];
+  var WEEKDAYS_SHORT = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
 
   var MOODS = [
     { id: 'hard',  label: 'Тяжело',   low: 'тяжело',   weight: 1 },
@@ -88,6 +89,42 @@ window.Diary = (function () {
     return out.sort();
   }
 
+  /* Дни, в которые реально что-то написано. Пустая запись днём не считается. */
+  function written() {
+    return days().filter(function (d) { return get(d).text.trim(); });
+  }
+
+  /* Текущая серия. Пока сегодняшний день не прожит до конца, серию держит
+     вчерашняя запись — иначе стрик обнулялся бы каждую полночь. */
+  function streak() {
+    var has = {};
+    written().forEach(function (d) { has[d] = true; });
+
+    var day = today();
+    if (!has[day]) {
+      day = shift(day, -1);
+      if (!has[day]) { return 0; }
+    }
+
+    var n = 0;
+    while (has[day]) { n++; day = shift(day, -1); }
+    return n;
+  }
+
+  function best() {
+    var list = written();
+    var top = 0;
+    var run = 0;
+    var prev = null;
+
+    list.forEach(function (d) {
+      run = (prev && shift(prev, 1) === d) ? run + 1 : 1;
+      if (run > top) { top = run; }
+      prev = d;
+    });
+    return top;
+  }
+
   function cursor() { return raw(CURSOR) || today(); }
 
   function setCursor(date) {
@@ -140,6 +177,16 @@ window.Diary = (function () {
     return WEEKDAYS[(parse(date).getDay() + 6) % 7];
   }
 
+  function weekdayShort(date) {
+    return WEEKDAYS_SHORT[(parse(date).getDay() + 6) % 7];
+  }
+
+  function plural(n, one, few, many) {
+    if (n % 10 === 1 && n % 100 !== 11) { return one; }
+    if ([2, 3, 4].indexOf(n % 10) >= 0 && [12, 13, 14].indexOf(n % 100) < 0) { return few; }
+    return many;
+  }
+
   function mood(id) {
     return MOODS.filter(function (m) { return m.id === id; })[0] || null;
   }
@@ -159,9 +206,11 @@ window.Diary = (function () {
   return {
     MOODS: MOODS, MONTHS_NOM: MONTHS_NOM,
     iso: iso, today: today, parse: parse, shift: shift,
-    get: get, set: set, days: days,
+    get: get, set: set, days: days, written: written,
+    streak: streak, best: best,
     cursor: cursor, setCursor: setCursor,
-    onChange: onChange, longDate: longDate, weekday: weekday,
+    onChange: onChange, longDate: longDate,
+    weekday: weekday, weekdayShort: weekdayShort, plural: plural,
     mood: mood, watchMidnight: watchMidnight
   };
 })();
