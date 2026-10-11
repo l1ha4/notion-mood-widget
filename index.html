@@ -4,54 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Как ты сегодня?</title>
+<link rel="stylesheet" href="diary.css">
 <style>
-  html, body {
-    margin: 0;
-    padding: 0;
-    background: transparent;
-  }
-
-  :root {
-    color-scheme: light dark;
-    --text: rgba(55, 53, 47, 0.85);
-    --text-dim: rgba(55, 53, 47, 0.5);
-    --line: rgba(55, 53, 47, 0.16);
-    --hover: rgba(55, 53, 47, 0.05);
-    --sel-bg: rgba(55, 53, 47, 0.08);
-    --sel-line: rgba(55, 53, 47, 0.42);
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --text: rgba(255, 255, 255, 0.81);
-      --text-dim: rgba(255, 255, 255, 0.44);
-      --line: rgba(255, 255, 255, 0.13);
-      --hover: rgba(255, 255, 255, 0.055);
-      --sel-bg: rgba(255, 255, 255, 0.1);
-      --sel-line: rgba(255, 255, 255, 0.38);
-    }
-  }
-
-  :root[data-theme="dark"] {
-    --text: rgba(255, 255, 255, 0.81);
-    --text-dim: rgba(255, 255, 255, 0.44);
-    --line: rgba(255, 255, 255, 0.13);
-    --hover: rgba(255, 255, 255, 0.055);
-    --sel-bg: rgba(255, 255, 255, 0.1);
-    --sel-line: rgba(255, 255, 255, 0.38);
-  }
-
-  body {
-    font-family: ui-sans-serif, -apple-system, "Segoe UI", Inter, Helvetica, Arial, sans-serif;
-    color: var(--text);
-    -webkit-font-smoothing: antialiased;
-    /* Notion задаёт высоту iframe сам: центрируем, чтобы лишнее место
-       не копилось снизу, а делилось поровну. */
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    box-sizing: border-box;
-  }
+  /* Notion задаёт высоту iframe сам: центрируем, чтобы лишнее место
+     не копилось снизу, а делилось поровну. */
+  body { display: flex; align-items: center; }
 
   .wrap {
     width: 100%;
@@ -60,34 +17,10 @@
     gap: 8px;
   }
 
-  .top {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 8px;
-  }
-
-  .title {
-    font-size: 13px;
-    font-weight: 600;
-    line-height: 1.2;
-  }
-
-  .status {
-    font-size: 12px;
-    line-height: 1.2;
-    color: var(--text-dim);
-    white-space: nowrap;
-    opacity: 0;
-    transition: opacity .15s ease;
-  }
-
+  .status { opacity: 0; transition: opacity .15s ease; }
   .status.on { opacity: 1; }
 
-  .row {
-    display: flex;
-    gap: 4px;
-  }
+  .row { display: flex; gap: 4px; }
 
   .opt {
     flex: 1 1 0;
@@ -109,23 +42,13 @@
 
   .opt:hover { background: var(--hover); color: var(--text); }
 
-  .opt:focus-visible {
-    outline: 1px solid var(--sel-line);
-    outline-offset: 1px;
-  }
-
   .opt[aria-pressed="true"] {
     background: var(--sel-bg);
     border-color: var(--sel-line);
     color: var(--text);
   }
 
-  .opt svg {
-    width: 18px;
-    height: 18px;
-    display: block;
-    flex: none;
-  }
+  .opt svg { width: 18px; height: 18px; display: block; flex: none; }
 
   .opt span {
     max-width: 100%;
@@ -143,103 +66,77 @@
 <body>
   <div class="wrap">
     <div class="top">
-      <div class="title">Как ты сегодня?</div>
-      <div class="status" id="status"></div>
+      <div class="title" id="head">Как ты сегодня?</div>
+      <div class="muted status" id="status"></div>
     </div>
-    <div class="row" id="row" role="group" aria-label="Как ты сегодня?"></div>
+    <div class="row" id="row" role="group" aria-label="Настроение дня"></div>
   </div>
 
+<script src="diary.js"></script>
 <script>
 (function () {
-  var MOODS = [
-    { id: 'hard',  label: 'Тяжело',   low: 'тяжело',   mouth: 'M8.5 16c.9-1.5 2.1-2.2 3.5-2.2s2.6.7 3.5 2.2', brows: true },
-    { id: 'meh',   label: 'Не очень', low: 'не очень', mouth: 'M8.5 15.4c.9-.9 2.1-1.4 3.5-1.4s2.6.5 3.5 1.4' },
-    { id: 'calm',  label: 'Спокойно', low: 'спокойно', mouth: 'M8.5 14.8h7' },
-    { id: 'good',  label: 'Хорошо',   low: 'хорошо',   mouth: 'M8.5 13.8c.9.9 2.1 1.4 3.5 1.4s2.6-.5 3.5-1.4' },
-    { id: 'great', label: 'Отлично',  low: 'отлично',  mouth: 'M8 13.4c.9 1.6 2.3 2.4 4 2.4s3.1-.8 4-2.4' }
-  ];
+  var SHAPES = {
+    hard:  { mouth: 'M8.5 16c.9-1.5 2.1-2.2 3.5-2.2s2.6.7 3.5 2.2', brows: true },
+    meh:   { mouth: 'M8.5 15.4c.9-.9 2.1-1.4 3.5-1.4s2.6.5 3.5 1.4' },
+    calm:  { mouth: 'M8.5 14.8h7' },
+    good:  { mouth: 'M8.5 13.8c.9.9 2.1 1.4 3.5 1.4s2.6-.5 3.5-1.4' },
+    great: { mouth: 'M8 13.4c.9 1.6 2.3 2.4 4 2.4s3.1-.8 4-2.4' }
+  };
 
-  var NS = 'mood:';
-
-  function today() {
-    var d = new Date();
-    return d.getFullYear() + '-' +
-      String(d.getMonth() + 1).padStart(2, '0') + '-' +
-      String(d.getDate()).padStart(2, '0');
-  }
-
-  function read(key) {
-    try { return localStorage.getItem(NS + key); } catch (e) { return null; }
-  }
-
-  function write(key, value) {
-    try { localStorage.setItem(NS + key, value); } catch (e) {}
-  }
-
-  var theme = new URLSearchParams(location.search).get('theme');
-  if (theme === 'dark' || theme === 'light') {
-    document.documentElement.setAttribute('data-theme', theme);
-  }
-
-  var face = '<circle cx="12" cy="12" r="9"/>' +
-    '<path d="M9 10h.01"/><path d="M15 10h.01"/>';
-
+  var face = '<circle cx="12" cy="12" r="9"/><path d="M9 10h.01"/><path d="M15 10h.01"/>';
   var row = document.getElementById('row');
   var status = document.getElementById('status');
-  var day = today();
-  var selected = read(day);
+  var head = document.getElementById('head');
 
-  function icon(m) {
+  function icon(id) {
+    var s = SHAPES[id];
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
       'stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
       face +
-      (m.brows ? '<path d="M8.6 7.9 10.4 8.8"/><path d="M15.4 7.9 13.6 8.8"/>' : '') +
-      '<path d="' + m.mouth + '"/>' +
-      '</svg>';
+      (s.brows ? '<path d="M8.6 7.9 10.4 8.8"/><path d="M15.4 7.9 13.6 8.8"/>' : '') +
+      '<path d="' + s.mouth + '"/></svg>';
   }
 
-  function render() {
-    var current = MOODS.filter(function (m) { return m.id === selected; })[0];
-    Array.prototype.forEach.call(row.children, function (btn) {
-      btn.setAttribute('aria-pressed', btn.dataset.id === selected ? 'true' : 'false');
-    });
-    if (current) {
-      status.textContent = 'Сегодня · ' + current.low;
-      status.classList.add('on');
-    } else {
-      status.textContent = '';
-      status.classList.remove('on');
-    }
-  }
-
-  MOODS.forEach(function (m) {
+  Diary.MOODS.forEach(function (m) {
     var btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'opt';
     btn.dataset.id = m.id;
     btn.setAttribute('aria-pressed', 'false');
     btn.title = m.label;
-    btn.innerHTML = icon(m) + '<span>' + m.label + '</span>';
+    btn.innerHTML = icon(m.id) + '<span>' + m.label + '</span>';
     btn.addEventListener('click', function () {
-      selected = (selected === m.id) ? null : m.id;
-      if (selected) { write(day, selected); }
-      else { try { localStorage.removeItem(NS + day); } catch (e) {} }
-      render();
+      var date = Diary.cursor();
+      var cur = Diary.get(date).mood;
+      Diary.set(date, { mood: cur === m.id ? null : m.id });
     });
     row.appendChild(btn);
   });
 
-  render();
+  function render() {
+    var date = Diary.cursor();
+    var isToday = date === Diary.today();
+    var day = Diary.get(date);
+    var m = Diary.mood(day.mood);
 
-  // Пересечение полуночи при открытой странице.
-  setInterval(function () {
-    var now = today();
-    if (now !== day) {
-      day = now;
-      selected = read(day);
-      render();
+    head.textContent = isToday ? 'Как ты сегодня?' : 'Как прошёл этот день?';
+
+    Array.prototype.forEach.call(row.children, function (btn) {
+      btn.setAttribute('aria-pressed', btn.dataset.id === day.mood ? 'true' : 'false');
+    });
+
+    if (m) {
+      status.textContent = (isToday ? 'Сегодня' : Diary.longDate(date)) + ' · ' + m.low;
+      status.classList.add('on');
+    } else {
+      status.textContent = isToday ? '' : Diary.longDate(date);
+      status.classList.toggle('on', !isToday);
     }
-  }, 60000);
+  }
+
+  Diary.onChange(render);
+  Diary.watchMidnight(render);
+  render();
 })();
 </script>
 </body>

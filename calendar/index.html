@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Месяц</title>
+<link rel="stylesheet" href="../diary.css">
+<style>
+  body { display: flex; }
+
+  .wrap {
+    width: 100%;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+  }
+
+  .dow {
+    font-size: 10px;
+    line-height: 1;
+    text-align: center;
+    padding-bottom: 2px;
+    color: var(--text-faint);
+  }
+
+  .day {
+    position: relative;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    font: inherit;
+    font-size: 11px;
+    color: var(--text-dim);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background .12s ease, border-color .12s ease, color .12s ease;
+  }
+
+  .day:hover { border-color: var(--line); color: var(--text); }
+  .day.blank { visibility: hidden; }
+  .day.filled { color: var(--text); }
+
+  /* Подчёркивание — в этот день есть текст, но настроение не отмечено. */
+  .day.has-text::after {
+    content: "";
+    position: absolute;
+    bottom: 4px;
+    width: 8px;
+    height: 1px;
+    background: var(--text-faint);
+  }
+
+  .day.filled.has-text::after { background: var(--text-dim); }
+
+  .day.today {
+    border-color: var(--line);
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .day.sel {
+    border-color: var(--sel-line);
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .foot {
+    flex: none;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .link {
+    padding: 0;
+    font: inherit;
+    font-size: 12px;
+    color: var(--text-dim);
+    background: none;
+    border: 0;
+    border-bottom: 1px solid var(--line);
+    cursor: pointer;
+    flex: none;
+  }
+
+  .link:hover { color: var(--text); }
+  .link:disabled { opacity: .4; cursor: default; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <span class="title" id="month"></span>
+      <span class="nav">
+        <button type="button" id="prev" title="Предыдущий месяц" aria-label="Предыдущий месяц">‹</button>
+        <button type="button" id="next" title="Следующий месяц" aria-label="Следующий месяц">›</button>
+      </span>
+    </div>
+
+    <div class="grid" id="dow" aria-hidden="true"></div>
+    <div class="grid" id="grid" role="group" aria-label="Дни месяца"></div>
+
+    <div class="foot">
+      <span class="muted" id="total"></span>
+      <button type="button" class="link" id="export">Экспорт</button>
+    </div>
+  </div>
+
+<script src="../diary.js"></script>
+<script>
+(function () {
+  var monthEl = document.getElementById('month');
+  var gridEl = document.getElementById('grid');
+  var totalEl = document.getElementById('total');
+  var exportBtn = document.getElementById('export');
+
+  // Плотность заливки растёт вместе с настроением: от «тяжело» к «отлично».
+  var TINT = { hard: 0.06, meh: 0.10, calm: 0.15, good: 0.21, great: 0.29 };
+
+  ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].forEach(function (d) {
+    var el = document.createElement('div');
+    el.className = 'dow';
+    el.textContent = d;
+    document.getElementById('dow').appendChild(el);
+  });
+
+  var view = Diary.parse(Diary.cursor());
+  view.setDate(1);
+
+  function stepMonth(delta) {
+    view.setMonth(view.getMonth() + delta);
+    render();
+  }
+
+  document.getElementById('prev').addEventListener('click', function () { stepMonth(-1); });
+  document.getElementById('next').addEventListener('click', function () { stepMonth(1); });
+
+  function plural(n) {
+    if (n % 10 === 1 && n % 100 !== 11) { return 'запись'; }
+    if ([2, 3, 4].indexOf(n % 10) >= 0 && [12, 13, 14].indexOf(n % 100) < 0) { return 'записи'; }
+    return 'записей';
+  }
+
+  function render() {
+    var year = view.getFullYear();
+    var month = view.getMonth();
+    var cursor = Diary.cursor();
+    var today = Diary.today();
+
+    monthEl.textContent = Diary.MONTHS_NOM[month] +
+      (year === new Date().getFullYear() ? '' : ' ' + year);
+
+    var first = new Date(year, month, 1);
+    var offset = (first.getDay() + 6) % 7;
+    var length = new Date(year, month + 1, 0).getDate();
+
+    gridEl.textContent = '';
+
+    for (var i = 0; i < offset; i++) {
+      var pad = document.createElement('div');
+      pad.className = 'day blank';
+      gridEl.appendChild(pad);
+    }
+
+    for (var d = 1; d <= length; d++) {
+      var date = Diary.iso(new Date(year, month, d));
+      var day = Diary.get(date);
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'day';
+      btn.dataset.date = date;
+      btn.textContent = d;
+
+      if (day.mood) {
+        btn.classList.add('filled');
+        btn.style.background = 'rgba(var(--ink), ' + TINT[day.mood] + ')';
+        btn.title = Diary.longDate(date) + ' · ' + Diary.mood(day.mood).low;
+      } else {
+        btn.title = Diary.longDate(date);
+      }
+      if (day.text) { btn.classList.add('has-text'); }
+      if (date === today) { btn.classList.add('today'); }
+      if (date === cursor) { btn.classList.add('sel'); }
+
+      btn.addEventListener('click', function () {
+        Diary.setCursor(this.dataset.date);
+      });
+      gridEl.appendChild(btn);
+    }
+
+    var n = Diary.days().length;
+    totalEl.textContent = n ? n + ' ' + plural(n) : 'Пока пусто';
+    exportBtn.disabled = !n;
+  }
+
+  exportBtn.addEventListener('click', function () {
+    var dates = Diary.days();
+    if (!dates.length) { return; }
+
+    var out = ['# Дневник', ''];
+    dates.forEach(function (date) {
+      var day = Diary.get(date);
+      var m = Diary.mood(day.mood);
+      out.push('## ' + date + ' · ' + Diary.weekday(date).toLowerCase());
+      if (m) { out.push('', 'Настроение: ' + m.low); }
+      if (day.text) { out.push('', day.text); }
+      out.push('');
+    });
+
+    var blob = new Blob([out.join('\n')], { type: 'text/markdown;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'dnevnik-' + Diary.today() + '.md';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  });
+
+  // Клик по дню в другом компоненте может увести курсор в соседний месяц.
+  Diary.onChange(function () {
+    var c = Diary.parse(Diary.cursor());
+    if (c.getFullYear() !== view.getFullYear() || c.getMonth() !== view.getMonth()) {
+      view = c;
+      view.setDate(1);
+    }
+    render();
+  });
+
+  Diary.watchMidnight(render);
+  render();
+})();
+</script>
+</body>
+</html>

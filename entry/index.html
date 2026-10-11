@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Запись дня</title>
+<link rel="stylesheet" href="../diary.css">
+<style>
+  body { display: flex; }
+
+  .wrap {
+    width: 100%;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .top { flex: none; }
+
+  .head {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .head .title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: none;
+  }
+
+  .saved {
+    opacity: 0;
+    transition: opacity .2s ease;
+  }
+
+  .saved.on { opacity: 1; }
+
+  textarea {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 60px;
+    resize: none;
+    padding: 8px 9px;
+    font: inherit;
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--text);
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    transition: border-color .12s ease;
+  }
+
+  textarea::placeholder { color: var(--text-faint); }
+  textarea:hover { border-color: var(--sel-line); }
+  textarea:focus { outline: none; border-color: var(--sel-line); }
+
+  .foot {
+    flex: none;
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .today-btn {
+    padding: 0;
+    font: inherit;
+    font-size: 12px;
+    color: var(--text-dim);
+    background: none;
+    border: 0;
+    border-bottom: 1px solid var(--line);
+    cursor: pointer;
+  }
+
+  .today-btn:hover { color: var(--text); }
+  .today-btn[hidden] { display: none; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div class="head">
+        <span class="title" id="date"></span>
+        <span class="muted" id="weekday"></span>
+      </div>
+      <div class="right">
+        <span class="muted saved" id="saved">Сохранено</span>
+        <span class="nav">
+          <button type="button" id="prev" title="Предыдущий день" aria-label="Предыдущий день">‹</button>
+          <button type="button" id="next" title="Следующий день" aria-label="Следующий день">›</button>
+        </span>
+      </div>
+    </div>
+
+    <textarea id="text" spellcheck="true"
+      placeholder="Что сегодня было, что осталось в голове…"></textarea>
+
+    <div class="foot">
+      <span class="muted" id="count"></span>
+      <button type="button" class="today-btn" id="today" hidden>Сегодня</button>
+    </div>
+  </div>
+
+<script src="../diary.js"></script>
+<script>
+(function () {
+  var ta = document.getElementById('text');
+  var dateEl = document.getElementById('date');
+  var weekdayEl = document.getElementById('weekday');
+  var countEl = document.getElementById('count');
+  var savedEl = document.getElementById('saved');
+  var todayBtn = document.getElementById('today');
+
+  var shown = null;      // какой день сейчас в поле
+  var timer = null;      // дебаунс автосохранения
+  var savedTimer = null;
+
+  function flash() {
+    savedEl.classList.add('on');
+    clearTimeout(savedTimer);
+    savedTimer = setTimeout(function () { savedEl.classList.remove('on'); }, 1200);
+  }
+
+  function count(text) {
+    var t = text.trim();
+    if (!t) { return ''; }
+    var words = t.split(/\s+/).length;
+    var tail = (words % 10 === 1 && words % 100 !== 11) ? 'слово'
+      : ([2, 3, 4].indexOf(words % 10) >= 0 && [12, 13, 14].indexOf(words % 100) < 0) ? 'слова'
+      : 'слов';
+    return words + ' ' + tail;
+  }
+
+  function commit() {
+    if (shown === null) { return; }
+    Diary.set(shown, { text: ta.value });
+    flash();
+  }
+
+  ta.addEventListener('input', function () {
+    countEl.textContent = count(ta.value);
+    clearTimeout(timer);
+    timer = setTimeout(commit, 500);
+  });
+
+  // Не теряем последние символы, если блок ушёл из фокуса раньше дебаунса.
+  ta.addEventListener('blur', function () { clearTimeout(timer); commit(); });
+  window.addEventListener('pagehide', function () { clearTimeout(timer); commit(); });
+
+  function go(delta) {
+    clearTimeout(timer);
+    commit();
+    Diary.setCursor(Diary.shift(Diary.cursor(), delta));
+  }
+
+  document.getElementById('prev').addEventListener('click', function () { go(-1); });
+  document.getElementById('next').addEventListener('click', function () { go(1); });
+  todayBtn.addEventListener('click', function () {
+    clearTimeout(timer);
+    commit();
+    Diary.setCursor(Diary.today());
+  });
+
+  function render() {
+    var date = Diary.cursor();
+    var isToday = date === Diary.today();
+
+    dateEl.textContent = isToday ? 'Сегодня' : Diary.longDate(date);
+    weekdayEl.textContent = isToday
+      ? Diary.longDate(date).toLowerCase()
+      : Diary.weekday(date).toLowerCase();
+    todayBtn.hidden = isToday;
+
+    // Чужие правки подхватываем, свой набор текста не перебиваем.
+    var stored = Diary.get(date).text;
+    if (date !== shown) {
+      shown = date;
+      ta.value = stored;
+    } else if (document.activeElement !== ta && ta.value !== stored) {
+      ta.value = stored;
+    }
+    countEl.textContent = count(ta.value);
+  }
+
+  Diary.onChange(render);
+  Diary.watchMidnight(render);
+  render();
+})();
+</script>
+</body>
+</html>
