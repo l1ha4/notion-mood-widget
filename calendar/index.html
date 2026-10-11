@@ -51,18 +51,6 @@
   .day.blank { visibility: hidden; }
   .day.filled { color: var(--text); }
 
-  /* Подчёркивание — в этот день есть текст, но настроение не отмечено. */
-  .day.has-text::after {
-    content: "";
-    position: absolute;
-    bottom: 4px;
-    width: 8px;
-    height: 1px;
-    background: var(--text-faint);
-  }
-
-  .day.filled.has-text::after { background: var(--text-dim); }
-
   .day.today {
     border-color: var(--line);
     font-weight: 600;
@@ -126,8 +114,14 @@
   var totalEl = document.getElementById('total');
   var exportBtn = document.getElementById('export');
 
-  // Плотность заливки растёт вместе с настроением: от «тяжело» к «отлично».
-  var TINT = { hard: 0.06, meh: 0.10, calm: 0.15, good: 0.21, great: 0.29 };
+  // Плотность заливки растёт вместе с объёмом записи.
+  function tint(text) {
+    var n = text.trim().length;
+    if (!n) { return 0; }
+    if (n < 150) { return 0.07; }
+    if (n < 500) { return 0.14; }
+    return 0.22;
+  }
 
   ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].forEach(function (d) {
     var el = document.createElement('div');
@@ -183,14 +177,12 @@
       btn.dataset.date = date;
       btn.textContent = d;
 
-      if (day.mood) {
+      var shade = tint(day.text);
+      if (shade) {
         btn.classList.add('filled');
-        btn.style.background = 'rgba(var(--ink), ' + TINT[day.mood] + ')';
-        btn.title = Diary.longDate(date) + ' · ' + Diary.mood(day.mood).low;
-      } else {
-        btn.title = Diary.longDate(date);
+        btn.style.background = 'rgba(var(--ink), ' + shade + ')';
       }
-      if (day.text) { btn.classList.add('has-text'); }
+      btn.title = Diary.longDate(date);
       if (date === today) { btn.classList.add('today'); }
       if (date === cursor) { btn.classList.add('sel'); }
 
@@ -200,23 +192,23 @@
       gridEl.appendChild(btn);
     }
 
-    var n = Diary.days().length;
+    var n = written().length;
     totalEl.textContent = n ? n + ' ' + plural(n) : 'Пока пусто';
     exportBtn.disabled = !n;
   }
 
+  function written() {
+    return Diary.days().filter(function (d) { return Diary.get(d).text.trim(); });
+  }
+
   exportBtn.addEventListener('click', function () {
-    var dates = Diary.days();
+    var dates = written();
     if (!dates.length) { return; }
 
     var out = ['# Дневник', ''];
     dates.forEach(function (date) {
-      var day = Diary.get(date);
-      var m = Diary.mood(day.mood);
       out.push('## ' + date + ' · ' + Diary.weekday(date).toLowerCase());
-      if (m) { out.push('', 'Настроение: ' + m.low); }
-      if (day.text) { out.push('', day.text); }
-      out.push('');
+      out.push('', Diary.get(date).text, '');
     });
 
     var blob = new Blob([out.join('\n')], { type: 'text/markdown;charset=utf-8' });
